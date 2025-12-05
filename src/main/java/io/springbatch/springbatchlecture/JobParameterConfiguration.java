@@ -1,6 +1,10 @@
 package io.springbatch.springbatchlecture;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
@@ -12,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
-public class JobInstanceConfiguration {
+public class JobParameterConfiguration {
 
 	private final JobBuilderFactory jobBuilderFactory;
 	private final StepBuilderFactory stepBuilderFactory;
@@ -28,6 +32,18 @@ public class JobInstanceConfiguration {
 	private Step step1() {
 		return stepBuilderFactory.get("step1")
 			.tasklet((contribution, chunkContext) -> {
+				JobParameters jobParameters = contribution.getStepExecution().getJobExecution().getJobParameters();
+				Map<String, String> params1 = new HashMap<>();
+
+				System.out.println("jobParameters.getString(\"name\") = " + jobParameters.getString("name"));
+				System.out.println("jobParameters.getLong(\"seq\") = " + jobParameters.getLong("seq"));
+				System.out.println("jobParameters.getDate(\"date\") = " + jobParameters.getDate("date"));
+				System.out.println("jobParameters.getDouble(\"age\") = " + jobParameters.getDouble("age"));
+
+				Map<String, Object> jobParameters1 = chunkContext.getStepContext().getJobParameters();
+
+
+				System.out.println("step1 was executed");
 				return RepeatStatus.FINISHED;
 			})
 			.build();
@@ -37,6 +53,7 @@ public class JobInstanceConfiguration {
 	private Step step2() {
 		return stepBuilderFactory.get("step2")
 			.tasklet((contribution, chunkContext) -> {
+				System.out.println("step2 was executed");
 				return RepeatStatus.FINISHED;
 			})
 			.build();
