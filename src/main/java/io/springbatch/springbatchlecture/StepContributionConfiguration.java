@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
-public class StepExecutionConfiguration {
+public class StepContributionConfiguration {
 
 	private final JobBuilderFactory jobBuilderFactory;
 	private final StepBuilderFactory stepBuilderFactory;
@@ -25,7 +25,6 @@ public class StepExecutionConfiguration {
 			.incrementer(new RunIdIncrementer())
 			.start(step1())
 			.next(step2())
-			.next(step3())
 			.build();
 	}
 
@@ -34,7 +33,8 @@ public class StepExecutionConfiguration {
 	public Step step1() {
 		return stepBuilderFactory.get("step1")
 			.tasklet((contribution, chunkContext) -> {
-				System.out.println("step1 was executed");
+				String jobName = contribution.getStepExecution().getJobExecution().getJobInstance().getJobName();
+				System.out.println("step1 was executed" + jobName);
 				return RepeatStatus.FINISHED;
 			})
 			.build();
@@ -60,5 +60,4 @@ public class StepExecutionConfiguration {
 			})
 			.build();
 	}
-
 }
