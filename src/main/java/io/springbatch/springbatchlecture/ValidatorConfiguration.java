@@ -60,4 +60,24 @@ public class ValidatorConfiguration {
 			.build();
 	}
 
+	@Bean
+	public Step step4() {
+		return this.stepBuilderFactory.get("step4")
+			.tasklet((contribution, chunkContext) -> {
+				System.out.println("step4 has executed");
+				return RepeatStatus.FINISHED;
+			})
+			.build();
+	}
+
+	@Bean
+	public Step step5() {
+		return this.stepBuilderFactory.get("step5")
+			.tasklet((contribution, chunkContext) -> {
+				System.out.println("step5 has executed");
+				return RepeatStatus.FINISHED;
+			})
+			.build();
+
+	}
 }
