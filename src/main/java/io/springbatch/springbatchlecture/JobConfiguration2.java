@@ -10,35 +10,39 @@ import org.springframework.context.annotation.Configuration;
 
 import lombok.RequiredArgsConstructor;
 
-@RequiredArgsConstructor
 @Configuration
-public class StepConfiguration {
+@RequiredArgsConstructor
+public class JobConfiguration2 {
 	private final JobBuilderFactory jobBuilderFactory;
 	private final StepBuilderFactory stepBuilderFactory;
 
-	public Job BatchJob() {
-		return jobBuilderFactory.get("job")
-			.start(Step1())
-			.next(Step2())
+	@Bean
+	public Job job() {
+		return this.jobBuilderFactory.get("batchJob2")
+			.start(step3())
+			.next(step4())
 			.build();
 	}
 
 	@Bean
-	public Step Step1() {
-		return stepBuilderFactory.get("step1")
-			.tasklet(
-				new CustomTasklet()
-			)
-			.build();
-	}
-
-	@Bean
-	public Step Step2() {
-		return stepBuilderFactory.get("step2")
+	public Step step3() {
+		return this.stepBuilderFactory.get("step3")
 			.tasklet((contribution, chunkContext) -> {
-				System.out.println("step2 was executed");
+				System.out.println("step3 has executed");
 				return RepeatStatus.FINISHED;
 			})
 			.build();
 	}
+
+	@Bean
+	public Step step4() {
+		return this.stepBuilderFactory.get("step4")
+			.tasklet((contribution, chunkContext) -> {
+				System.out.println("step4 has executed");
+				return RepeatStatus.FINISHED;
+			})
+			.build();
+	}
+
+
 }
