@@ -41,7 +41,7 @@ graph TD
 ----
 
 ---
-
+[source, mermaid]
 ----
 graph TD
     %% 스타일 정의 (이미지 색상 참고)
