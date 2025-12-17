@@ -1,0 +1,156 @@
+
+= Spring Batch: FlowJob - start() / next()
+:doctype: book
+:toc: left
+:toclevels: 2
+:sectnums:
+:source-highlighter: rouge
+:icons: font
+
+== 개요
+스프링 배치에서는 Job의 흐름을 제어하기 위해 Flow라는 개념을 제공합니다. Flow를 사용하면 Job 내에서 여러 Step 간의 흐름을 논리적으로 구성할 수 있습니다.
+
+
+== Flow Job 실행 흐름도 (Flow Diagram)
+Flow Job 실행 흐름도
+
+[mermaid]
+----
+graph TD
+    %% 1. Flow A 영역
+    subgraph FlowA [Flow A]
+        direction TB
+        Step1[Step 1] --> Step2[Step 2]
+    end
+
+    %% 2. Step 3 (단일)
+    StepA[Step 3]
+
+    %% 3. Flow B 영역
+    subgraph FlowB [Flow B]
+        direction TB
+        Step4[Step 4] --> Step5[Step 5]
+    end
+
+    %% 4. Step 6 (단일)
+    StepB[Step 6]
+
+    %% 전체 연결 흐름
+    FlowA --> StepA
+    StepA --> FlowB
+    FlowB --> StepB
+----
+
+---
+
+[mermaid]
+----
+graph TD
+    %% 스타일 정의 (이미지 색상 참고)
+    classDef flowHeader fill:#F37021,stroke:#333,color:white,font-weight:bold;
+    classDef innerStep fill:#E0E0E0,stroke:#333,color:black;
+    classDef outerStep fill:#333,stroke:#333,color:white;
+
+    subgraph JobFlow [FlowJob Configuration]
+        direction TB
+
+        %% --- Flow A ---
+        subgraph GroupA [Flow A]
+            direction TB
+            %% Flow A 타이틀용 더미 노드 (시각적 표현용)
+            FA_Title(Flow A):::flowHeader
+            S1(Step 1):::innerStep
+            S2(Step 2):::innerStep
+
+            FA_Title --> S1 --> S2
+        end
+
+        %% --- Step 3 ---
+        SA(Step 3):::outerStep
+
+        %% --- Flow B ---
+        subgraph GroupB [Flow B]
+            direction TB
+            %% Flow B 타이틀용 더미 노드
+            FB_Title(Flow B):::flowHeader
+            S4(Step 4):::innerStep
+            S5(Step 5):::innerStep
+
+            FB_Title --> S4 --> S5
+        end
+
+        %% --- Step 6 ---
+        SB(Step 6):::outerStep
+
+        %% --- 전체 연결 ---
+        GroupA --> SA
+        SA --> GroupB
+        GroupB --> SB
+    end
+
+    %% 서브그래프 배경색 투명하게 또는 흰색으로 설정
+    style GroupA fill:#fff,stroke:#F37021,stroke-width:2px,stroke-dasharray: 5 5
+    style GroupB fill:#fff,stroke:#F37021,stroke-width:2px,stroke-dasharray: 5 5
+    style JobFlow fill:#fff,stroke:none
+----
+
+- Step 을 Flow 별로 분리하여 구성하는 장점은 있지만 Step 중 하나라도 실패할 경우 전체 Job 이 실패하는 규칙은 동일합니다.
+
+== Flow Job 예제
+
+다음은 Flow Job을 구성하는 간단한 예제입니다.
+[source,java]
+----
+@Bean
+	public Flow flowA() {
+
+		FlowBuilder<Flow> flowBuilder = new FlowBuilder<>("flowA");
+
+		flowBuilder.start(step1())
+			.next(step2())
+			.end();
+
+		return flowBuilder.build();
+
+	}
+
+	@Bean
+	public Flow flowB() {
+
+		FlowBuilder<Flow> flowBuilder = new FlowBuilder<>("flowB");
+		flowBuilder.start(step4())
+			.next(step5())
+			.end();
+
+		return flowBuilder.build();
+	}
+----
+
+
+
+== 결론
+Flow Job을 사용하면 스프링 배치에서 복잡한 작업 흐름을 쉽게 제어할 수 있습니다.
+
+[source, shell]
+----
+2025-12-17 15:22:56.073  INFO 33505 --- [           main] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=batchJob]] launched with the following parameters: [{date=20210101}]
+2025-12-17 15:22:56.101  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step1]
+step1 has executed
+2025-12-17 15:22:56.116  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step1] executed in 15ms
+2025-12-17 15:22:56.126  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step2]
+step2 has executed
+2025-12-17 15:22:56.132  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step2] executed in 6ms
+2025-12-17 15:22:56.142  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step3]
+step3 has executed
+2025-12-17 15:22:56.148  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step3] executed in 6ms
+2025-12-17 15:22:56.157  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step4]
+step4 has executed
+2025-12-17 15:22:56.162  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step4] executed in 5ms
+2025-12-17 15:22:56.170  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step5]
+step5 has executed
+2025-12-17 15:22:56.176  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step5] executed in 6ms
+2025-12-17 15:22:56.184  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step6]
+step6 has executed
+2025-12-17 15:22:56.189  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step6] executed in 5ms
+2025-12-17 15:22:56.194  INFO 33505 --- [           main] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=batchJob]] completed with the following parameters: [{date=20210101}] and the following status: [COMPLETED] in 112ms
+----
