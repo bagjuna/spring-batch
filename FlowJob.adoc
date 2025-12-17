@@ -21,7 +21,7 @@ Flow Job은 여러 Step을 포함하는 Job으로, 각 Step의 실행 결과에 
 == Flow Job 실행 흐름도 (Flow Diagram)
 Flow Job 실행 흐름도
 
-[mermaid]
+[source, mermaid]
 ----
 graph TD
     Start((Start)) --> Step1[Step 1]

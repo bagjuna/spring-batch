@@ -1,4 +1,3 @@
-
 = Spring Batch: FlowJob - start() / next()
 :doctype: book
 :toc: left
@@ -14,7 +13,7 @@
 == Flow Job 실행 흐름도 (Flow Diagram)
 Flow Job 실행 흐름도
 
-[mermaid]
+[source, mermaid]
 ----
 graph TD
     %% 1. Flow A 영역
@@ -43,7 +42,6 @@ graph TD
 
 ---
 
-[mermaid]
 ----
 graph TD
     %% 스타일 정의 (이미지 색상 참고)
