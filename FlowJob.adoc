@@ -1,0 +1,53 @@
+
+= Spring Batch: 조건별 흐름 제어 (Flow Job)
+:doctype: book
+:toc: left
+:toclevels: 2
+:sectnums:
+:source-highlighter: rouge
+:icons: font
+
+== 개요
+스프링 배치에서는 Job의 흐름을 제어하기 위해 Flow라는 개념을 제공합니다. Flow를 사용하면 Job 내에서 여러 Step 간의 조건부 흐름 제어가 가능합니다.
+
+== Flow Job의 개념
+Flow Job은 여러 Step을 포함하는 Job으로, 각 Step의 실행 결과에 따라 다음 Step으로의 흐름이 결정됩니다.
+
+== Flow Job 구성 요소
+* Step: Job 내에서 실행되는 단위 작업
+* Flow: 여러 Step을 포함하는 논리적인 단위
+* Job: Flow를 포함하는 최상위 단위
+
+== Flow Job 실행 흐름도 (Flow Diagram)
+Flow Job 실행 흐름도
+
+[source,mermaid]
+----
+graph TD
+    Start((Start)) --> Step1[Step 1]
+    Step1 -- "성공(Yes)" --> Step2[Step 2]
+    Step1 -- "실패(No)" --> Step3[Step 3]
+    Step2 --> Step4[Step 4]
+    Step3 --> Step4
+    Step4 --> Stop((Stop))
+----
+
+== Flow Job 예제
+다음은 Flow Job을 구성하는 간단한 예제입니다.
+
+[source,java]
+----
+@Bean
+public Job batchJob() {
+    return this.jobBuilderFactory.get("batchJob")
+        .start(step1())                // 1. step1 시작
+        .on("COMPLETED").to(step3())   // 2. 결과가 COMPLETED라면 step3로 이동
+        .from(step1())                 // 3. 다시 step1의 결과를 기준으로
+        .on("FAILED").to(step2())      // 4. 결과가 FAILED라면 step2로 이동
+        .end()                         // 5. Flow 종료
+        .build();
+}
+----
+
+== 결론
+Flow Job을 사용하면 스프링 배치에서 복잡한 작업 흐름을 쉽게 제어할 수 있습니다.
