@@ -36,41 +36,16 @@
 == Flow Job 실행 흐름도 (Flow Diagram)
 Flow Job 실행 흐름도
 
-[source, mermaid]
+[mermaid]
 ----
 graph TD
-    %% 1. Flow A 영역
-    subgraph FlowA [Flow A]
-        direction TB
-        Step1[Step 1] --> Step2[Step 2]
-    end
-
-    %% 2. Step 3 (단일)
-    StepA[Step 3]
-
-    %% 3. Flow B 영역
-    subgraph FlowB [Flow B]
-        direction TB
-        Step4[Step 4] --> Step5[Step 5]
-    end
-
-    %% 4. Step 6 (단일)
-    StepB[Step 6]
-
-    %% 전체 연결 흐름
-    FlowA --> StepA
-    StepA --> FlowB
-    FlowB --> StepB
-----
-
----
-
-----
-graph TD
-    %% 스타일 정의 (이미지 색상 참고)
-    classDef flowHeader fill:#F37021,stroke:#333,color:white,font-weight:bold;
-    classDef innerStep fill:#E0E0E0,stroke:#333,color:black;
-    classDef outerStep fill:#333,stroke:#333,color:white;
+    %% --- 스타일 정의 ---
+    classDef blackBox fill:black,stroke:#333,color:white,rx:5,ry:5;
+    classDef dbShape shape:cylinder,fill:#5D9CEC,stroke:#4A89DC,color:white;
+    classDef decision fill:#ddd,stroke:#333,color:black,rhombus;
+    classDef failState fill:white,stroke:#FF0000,stroke-width:2px,color:red;
+    classDef passState fill:white,stroke:#0000FF,stroke-width:2px,color:blue;
+    classDef executionObj fill:black,stroke:#333,color:white,font-size:12px;
 
     %% --- 노드 정의 ---
     Job(SimpleJob):::blackBox
