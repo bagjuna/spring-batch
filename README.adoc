@@ -36,7 +36,14 @@
 == Flow Job 실행 흐름도 (Flow Diagram)
 Flow Job 실행 흐름도
 
+ifdef::env-github[]
+[source,mermaid]
+endif::[]
+
+// GitHub가 아니면(인텔리제이 등) [mermaid]를 써라
+ifndef::env-github[]
 [mermaid]
+endif::[]
 ----
 graph TD
     %% --- 스타일 정의 ---
