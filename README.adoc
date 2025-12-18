@@ -1,4 +1,4 @@
-= Spring Batch: FlowJob - start() / next()
+= Spring Batch: FlowJob - 배치 상태 유형
 :doctype: book
 :toc: left
 :toclevels: 2
@@ -7,8 +7,31 @@
 :icons: font
 
 == 개요
-스프링 배치에서는 Job의 흐름을 제어하기 위해 Flow라는 개념을 제공합니다. Flow를 사용하면 Job 내에서 여러 Step 간의 흐름을 논리적으로 구성할 수 있습니다.
+* `BatchStatus` : jobExecution 과 stepExecution의 속성으로 Job 과 Step의 종료 후 최종 상태가 무엇엇인지 정의
+* `SimpleJob`
+** 마지막 Step의 BatchStatus를 Job의 BatchStatus값으로 반영
+** Step이 실패할 경우 해당 Step이 마지막 Step이 된다.
+* `FlowJob`
+** Flow 내 Step의 ExitStatus 값을 FlowExecutionStatus값으로 저장
+** 마지막 Flow 의 FlowExecutionStatus 값을 Job의 BatchStatus 값으로 반영
 
+* `BatchStatus` 유형
+** COMPLETED : 정상 종료
+** FAILED : 실패
+** STARTED : 시작됨
+** STOPPING : 중지 중
+** STOPPED : 중지
+** FAILED : 실패
+** ABANDONED : 포기됨
+** UNKNOWN : 알 수 없음
+
+* ABANDONED는 처리를 완료했지만, 성공하지 못한 단계와 재시작시 건너 뛰어야하는 단계
+
+* FlowExecutionStatus
+** FlowExecution의 속성으로 Flow의 실행 후 최종 상태가 무엇인지 정의
+** Flow 내 Step이 실행되고 나서 ExitStatus 값을 FlowExecutionStatus 값으로 반영
+** FlowJob의 배치 결과 상태에 관여함
+** COMPLETED, STOPPED, FAILED, UNKNOWN 유형이 있음
 
 == Flow Job 실행 흐름도 (Flow Diagram)
 Flow Job 실행 흐름도
@@ -49,106 +72,86 @@ graph TD
     classDef innerStep fill:#E0E0E0,stroke:#333,color:black;
     classDef outerStep fill:#333,stroke:#333,color:white;
 
-    subgraph JobFlow [FlowJob Configuration]
-        direction TB
+    %% --- 노드 정의 ---
+    Job(SimpleJob):::blackBox
+    S1(Step1):::blackBox
+    S2(Step2):::blackBox
+    DB[(DB)]:::dbShape
 
-        %% --- Flow A ---
-        subgraph GroupA [Flow A]
-            direction TB
-            %% Flow A 타이틀용 더미 노드 (시각적 표현용)
-            FA_Title(Flow A):::flowHeader
-            S1(Step 1):::innerStep
-            S2(Step 2):::innerStep
+    %% --- 흐름 시작 ---
+    Job --> S1
+    Job --> S2
+    S1 --> D1{ExitStatus ?}:::decision
 
-            FA_Title --> S1 --> S2
-        end
+    %% [Step 1] 분기 처리
+    D1 -- FAILED --> St1_Fail[ExitStatus.FAILED<br/>BatchStatus.FAILED]:::failState
+    D1 -- COMPLETED --> St1_Pass[ExitStatus.COMPLETED<br/>BatchStatus.COMPLETED]:::passState
 
-        %% --- Step 3 ---
-        SA(Step 3):::outerStep
+    %% [Step 1] 결과에 따른 DB 저장 (Entity 표현)
+    St1_Fail --- JE1[JobExecution]:::executionObj
+    St1_Fail --- SE1[StepExecution]:::executionObj
+    JE1 & SE1 --> DB
 
-        %% --- Flow B ---
-        subgraph GroupB [Flow B]
-            direction TB
-            %% Flow B 타이틀용 더미 노드
-            FB_Title(Flow B):::flowHeader
-            S4(Step 4):::innerStep
-            S5(Step 5):::innerStep
+    St1_Pass --- JE2[JobExecution]:::executionObj
+    St1_Pass --- SE2[StepExecution]:::executionObj
+    JE2 & SE2 -.-> DB
 
-            FB_Title --> S4 --> S5
-        end
+    %% [Step 2] 연결 (성공 시 이동)
+    St1_Pass -->|Job 종료하지 않고<br/>다음 Step 실행| S2
+    S2 --> D2{ExitStatus ?}:::decision
 
-        %% --- Step 6 ---
-        SB(Step 6):::outerStep
+    %% [Step 2] 분기 처리
+    D2 -- FAILED --> St2_Fail[ExitStatus.FAILED<br/>BatchStatus.FAILED]:::failState
+    D2 -- COMPLETED --> St2_Pass[ExitStatus.COMPLETED<br/>BatchStatus.COMPLETED]:::passState
 
-        %% --- 전체 연결 ---
-        GroupA --> SA
-        SA --> GroupB
-        GroupB --> SB
-    end
+    %% [Step 2] 결과에 따른 DB 저장
+    St2_Fail --- JE3[JobExecution]:::executionObj
+    St2_Fail --- SE3[StepExecution]:::executionObj
+    JE3 & SE3 --> DB
 
-    %% 서브그래프 배경색 투명하게 또는 흰색으로 설정
-    style GroupA fill:#fff,stroke:#F37021,stroke-width:2px,stroke-dasharray: 5 5
-    style GroupB fill:#fff,stroke:#F37021,stroke-width:2px,stroke-dasharray: 5 5
-    style JobFlow fill:#fff,stroke:none
+    St2_Pass --- JE4[JobExecution]:::executionObj
+    St2_Pass --- SE4[StepExecution]:::executionObj
+    JE4 & SE4 --> DB
 ----
 
-- Step 을 Flow 별로 분리하여 구성하는 장점은 있지만 Step 중 하나라도 실패할 경우 전체 Job 이 실패하는 규칙은 동일합니다.
-
 == Flow Job 예제
-
-다음은 Flow Job을 구성하는 간단한 예제입니다.
 [source,java]
 ----
 @Bean
-	public Flow flowA() {
-
-		FlowBuilder<Flow> flowBuilder = new FlowBuilder<>("flowA");
-
-		flowBuilder.start(step1())
-			.next(step2())
-			.end();
-
-		return flowBuilder.build();
-
+	public Job batchJob() {
+		return this.jobBuilderFactory.get("batchJob")
+			.start(step1())
+			.on("FAILED")  // step1의 ExitStatus가 FAILED일 때
+			.to(step2())   // step2로 이동
+			.end()         // flow 종료
+			.build();
 	}
 
 	@Bean
-	public Flow flowB() {
+	public Step step1() {
+		return stepBuilderFactory.get("step1")
+			.tasklet((contribution, chunkContext) -> {
+				System.out.println("step1 has executed");
+				contribution.setExitStatus(ExitStatus.FAILED);
+				return RepeatStatus.FINISHED;
+			})
+			.build();
+	}
 
-		FlowBuilder<Flow> flowBuilder = new FlowBuilder<>("flowB");
-		flowBuilder.start(step4())
-			.next(step5())
-			.end();
-
-		return flowBuilder.build();
+	@Bean
+	public Step step2() {
+		return stepBuilderFactory.get("step2")
+			.tasklet((contribution, chunkContext) -> {
+				System.out.println("step2 has executed");
+				// contribution.setExitStatus(ExitStatus.FAILED);
+				return RepeatStatus.FINISHED;
+			})
+			.build();
 	}
 ----
 
-
-
 == 결론
-Flow Job을 사용하면 스프링 배치에서 복잡한 작업 흐름을 쉽게 제어할 수 있습니다.
+* FlowJob은 Flow 내 Step의 ExitStatus 값을 FlowExecutionStatus값으로 저장하고, 마지막 Flow 의 FlowExecutionStatus 값을 Job의 BatchStatus 값으로 반영합니다.
+* 이를 통해 FlowJob은 복잡한 작업 흐름을 효과적으로 관리하고 제어할 수 있습니다.
+* FlowJob을 사용하여 다양한 조건에 따라 작업 흐름을 제어할 수 있으며, 이를 통해 배치 작업의 유연성과 확장성을 높일 수 있습니다.
 
-[source, shell]
-----
-2025-12-17 15:22:56.073  INFO 33505 --- [           main] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=batchJob]] launched with the following parameters: [{date=20210101}]
-2025-12-17 15:22:56.101  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step1]
-step1 has executed
-2025-12-17 15:22:56.116  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step1] executed in 15ms
-2025-12-17 15:22:56.126  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step2]
-step2 has executed
-2025-12-17 15:22:56.132  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step2] executed in 6ms
-2025-12-17 15:22:56.142  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step3]
-step3 has executed
-2025-12-17 15:22:56.148  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step3] executed in 6ms
-2025-12-17 15:22:56.157  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step4]
-step4 has executed
-2025-12-17 15:22:56.162  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step4] executed in 5ms
-2025-12-17 15:22:56.170  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step5]
-step5 has executed
-2025-12-17 15:22:56.176  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step5] executed in 6ms
-2025-12-17 15:22:56.184  INFO 33505 --- [           main] o.s.batch.core.job.SimpleStepHandler     : Executing step: [step6]
-step6 has executed
-2025-12-17 15:22:56.189  INFO 33505 --- [           main] o.s.batch.core.step.AbstractStep         : Step: [step6] executed in 5ms
-2025-12-17 15:22:56.194  INFO 33505 --- [           main] o.s.b.c.l.support.SimpleJobLauncher      : Job: [FlowJob: [name=batchJob]] completed with the following parameters: [{date=20210101}] and the following status: [COMPLETED] in 112ms
-----
