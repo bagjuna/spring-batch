@@ -7,94 +7,19 @@
 :icons: font
 
 == 개요
-* `BatchStatus` : jobExecution 과 stepExecution의 속성으로 Job 과 Step의 종료 후 최종 상태가 무엇엇인지 정의
-* `SimpleJob`
-** 마지막 Step의 BatchStatus를 Job의 BatchStatus값으로 반영
-** Step이 실패할 경우 해당 Step이 마지막 Step이 된다.
-* `FlowJob`
-** Flow 내 Step의 ExitStatus 값을 FlowExecutionStatus값으로 저장
-** 마지막 Flow 의 FlowExecutionStatus 값을 Job의 BatchStatus 값으로 반영
+* Transition
+** Flow 내 Step의 조건부 전환(전이)을 정의
+** Job의 API 설정에서 on(String pattern) 메소드를 호출하면 TransitionBuilder가 반환되어 Transition Flow 구성이 가능
+** Step의 종료상태(ExitStatus)가 어떤 pattern과도 매칭되지 않으면 스프링 배치에서 예외를 발생하고 Job이 실패 처리됨
+** transition은 구체적인 것 부터 그렇지 않은 순서로 적용된다.
 
-* `BatchStatus` 유형
-** COMPLETED : 정상 종료
-** FAILED : 실패
-** STARTED : 시작됨
-** STOPPING : 중지 중
-** STOPPED : 중지
-** FAILED : 실패
-** ABANDONED : 포기됨
-** UNKNOWN : 알 수 없음
+* API
+** on(String pattern)
+*** Step의 실행 결과로 돌려받는 종료상태(ExitStatus)와 매칭되는 패턴 스키마, BatchStatus와 매칭하는 것이 아님
+*** pattern은 와일드카드(*)를 포함할 수 있음
 
-* ABANDONED는 처리를 완료했지만, 성공하지 못한 단계와 재시작시 건너 뛰어야하는 단계
 
-* FlowExecutionStatus
-** FlowExecution의 속성으로 Flow의 실행 후 최종 상태가 무엇인지 정의
-** Flow 내 Step이 실행되고 나서 ExitStatus 값을 FlowExecutionStatus 값으로 반영
-** FlowJob의 배치 결과 상태에 관여함
-** COMPLETED, STOPPED, FAILED, UNKNOWN 유형이 있음
 
-== Flow Job 실행 흐름도 (Flow Diagram)
-Flow Job 실행 흐름도
-
-ifdef::env-github[]
-[source,mermaid]
-endif::[]
-
-// GitHub가 아니면(인텔리제이 등) [mermaid]를 써라
-ifndef::env-github[]
-[mermaid]
-endif::[]
-----
-graph TD
-    %% --- 스타일 정의 ---
-    classDef blackBox fill:black,stroke:#333,color:white,rx:5,ry:5;
-    classDef dbShape shape:cylinder,fill:#5D9CEC,stroke:#4A89DC,color:white;
-    classDef decision fill:#ddd,stroke:#333,color:black,rhombus;
-    classDef failState fill:white,stroke:#FF0000,stroke-width:2px,color:red;
-    classDef passState fill:white,stroke:#0000FF,stroke-width:2px,color:blue;
-    classDef executionObj fill:black,stroke:#333,color:white,font-size:12px;
-
-    %% --- 노드 정의 ---
-    Job(SimpleJob):::blackBox
-    S1(Step1):::blackBox
-    S2(Step2):::blackBox
-    DB[(DB)]:::dbShape
-
-    %% --- 흐름 시작 ---
-    Job --> S1
-    Job --> S2
-    S1 --> D1{ExitStatus ?}:::decision
-
-    %% [Step 1] 분기 처리
-    D1 -- FAILED --> St1_Fail[ExitStatus.FAILED<br/>BatchStatus.FAILED]:::failState
-    D1 -- COMPLETED --> St1_Pass[ExitStatus.COMPLETED<br/>BatchStatus.COMPLETED]:::passState
-
-    %% [Step 1] 결과에 따른 DB 저장 (Entity 표현)
-    St1_Fail --- JE1[JobExecution]:::executionObj
-    St1_Fail --- SE1[StepExecution]:::executionObj
-    JE1 & SE1 --> DB
-
-    St1_Pass --- JE2[JobExecution]:::executionObj
-    St1_Pass --- SE2[StepExecution]:::executionObj
-    JE2 & SE2 -.-> DB
-
-    %% [Step 2] 연결 (성공 시 이동)
-    St1_Pass -->|Job 종료하지 않고<br/>다음 Step 실행| S2
-    S2 --> D2{ExitStatus ?}:::decision
-
-    %% [Step 2] 분기 처리
-    D2 -- FAILED --> St2_Fail[ExitStatus.FAILED<br/>BatchStatus.FAILED]:::failState
-    D2 -- COMPLETED --> St2_Pass[ExitStatus.COMPLETED<br/>BatchStatus.COMPLETED]:::passState
-
-    %% [Step 2] 결과에 따른 DB 저장
-    St2_Fail --- JE3[JobExecution]:::executionObj
-    St2_Fail --- SE3[StepExecution]:::executionObj
-    JE3 & SE3 --> DB
-
-    St2_Pass --- JE4[JobExecution]:::executionObj
-    St2_Pass --- SE4[StepExecution]:::executionObj
-    JE4 & SE4 --> DB
-----
 
 == Flow Job 예제
 [source,java]
@@ -103,37 +28,46 @@ graph TD
 	public Job batchJob() {
 		return this.jobBuilderFactory.get("batchJob")
 			.start(step1())
-			.on("FAILED")  // step1의 ExitStatus가 FAILED일 때
-			.to(step2())   // step2로 이동
-			.end()         // flow 종료
-			.build();
-	}
-
-	@Bean
-	public Step step1() {
-		return stepBuilderFactory.get("step1")
-			.tasklet((contribution, chunkContext) -> {
-				System.out.println("step1 has executed");
-				contribution.setExitStatus(ExitStatus.FAILED);
-				return RepeatStatus.FINISHED;
-			})
-			.build();
-	}
-
-	@Bean
-	public Step step2() {
-		return stepBuilderFactory.get("step2")
-			.tasklet((contribution, chunkContext) -> {
-				System.out.println("step2 has executed");
-				// contribution.setExitStatus(ExitStatus.FAILED);
-				return RepeatStatus.FINISHED;
-			})
+				.on("FAILED")
+				.to(step2())
+				.on("FAILED")
+				.stop()
+			.from(step1())
+				.on("*")
+				.to(step3())
+				.next(step4())
+			.from(step2())
+				.on("*")
+				.to(step5())
+			.end()
 			.build();
 	}
 ----
 
+== 모든 Step이 성공하는 경우
+Flow Job 실행 흐름도
+[source, mermaid]
+----
+graph TD
+    Start((Start)) --> Step1[Step 1]
+    Step1 -- "성공(Yes)" --> Step3[Step 3]
+    Step3 --> Step4[Step 4]
+    Step4 --> Stop((Stop))
+
+----
+
+
+== step1이 실패하는 경우
+
+[source, mermaid]
+----
+graph TD
+    Start((Start)) --> Step1[Step 1]
+    Step1 -- "실패(No)" --> Step2[Step 2]
+    Step2 --> Step5[Step 5]
+    Step5 --> Stop((Stop))
+----
+
+
 == 결론
-* FlowJob은 Flow 내 Step의 ExitStatus 값을 FlowExecutionStatus값으로 저장하고, 마지막 Flow 의 FlowExecutionStatus 값을 Job의 BatchStatus 값으로 반영합니다.
-* 이를 통해 FlowJob은 복잡한 작업 흐름을 효과적으로 관리하고 제어할 수 있습니다.
-* FlowJob을 사용하여 다양한 조건에 따라 작업 흐름을 제어할 수 있으며, 이를 통해 배치 작업의 유연성과 확장성을 높일 수 있습니다.
 
