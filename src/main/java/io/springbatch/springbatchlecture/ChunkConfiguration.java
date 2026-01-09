@@ -1,11 +1,15 @@
 package io.springbatch.springbatchlecture;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
-import org.springframework.batch.core.job.builder.FlowBuilder;
-import org.springframework.batch.core.job.flow.Flow;
+import org.springframework.batch.item.ItemProcessor;
+import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,44 +18,42 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 @Configuration
-public class FlowStepConfiguration {
+public class ChunkConfiguration {
+
 	private final JobBuilderFactory jobBuilderFactory;
 	private final StepBuilderFactory stepBuilderFactory;
 
 	@Bean
 	public Job job() {
-		return jobBuilderFactory.get("batchJob")
-			.start(flowStep())
+		return this.jobBuilderFactory
+			.get("batchJob")
+			.start(step1())
 			.next(step2())
 			.build();
 	}
 
-	private Step flowStep() {
-		return stepBuilderFactory.get("flowStep")
-			.flow(flow())
-			.build();
-	}
-
-	private Flow flow() {
-
-		FlowBuilder<Flow> flowBuilder = new FlowBuilder<>("flow1");
-		flowBuilder.start(step1())
-			.end();
-		return flowBuilder.build();
-	}
-
-
 	@Bean
 	public Step step1() {
 		return stepBuilderFactory.get("step1")
-			.tasklet((contribution, chunkContext) -> {
-				System.out.println("step1 has executed");
-				throw new RuntimeException("step1 failed");
-				// return RepeatStatus.FINISHED;
+			.<String, String>chunk(5)
+			.reader(new ListItemReader<>(Arrays.asList("item1", "item2", "item3", "item4", "item5")))
+			.processor(new ItemProcessor<String, String>() {
+				@Override
+				public String process(String item) throws Exception {
+					Thread.sleep(300);
+					System.out.println("item = " + item);
+					return "my" + item;
+				}
+			})
+			.writer(new ItemWriter<String>() {
+				@Override
+				public void write(List<? extends String> items) throws Exception {
+					Thread.sleep(300);
+					System.out.println("items = " + items);
+				}
 			})
 			.build();
 	}
-
 	@Bean
 	public Step step2() {
 		return stepBuilderFactory.get("step2")
@@ -61,5 +63,4 @@ public class FlowStepConfiguration {
 			})
 			.build();
 	}
-
 }
