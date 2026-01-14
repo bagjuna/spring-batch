@@ -1,5 +1,8 @@
 package io.springbatch.springbatchlecture;
 
+
+import javax.sql.DataSource;
+
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
@@ -7,6 +10,7 @@ import org.springframework.batch.core.configuration.annotation.StepBuilderFactor
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
 import org.springframework.batch.item.json.JacksonJsonObjectReader;
 import org.springframework.batch.item.json.builder.JsonItemReaderBuilder;
 import org.springframework.context.annotation.Bean;
@@ -17,10 +21,12 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 @Configuration
-public class JsonConfiguration {
+public class JdbcCursorConfiguration {
 
 	private final JobBuilderFactory jobBuilderFactory;
 	private final StepBuilderFactory stepBuilderFactory;
+	private final int chunkSize = 10;
+	private final DataSource dataSource;
 
 	@Bean
 	public Job job() {
@@ -33,7 +39,7 @@ public class JsonConfiguration {
 	@Bean
 	public Step step1() {
 		return stepBuilderFactory.get("step1")
-			.<Customer, Customer>chunk(3)
+			.<Customer, Customer>chunk(chunkSize)
 			.reader(customItemReader())
 			.writer(customItemWriter())
 			.build();
@@ -41,11 +47,17 @@ public class JsonConfiguration {
 
 	@Bean
 	public ItemReader<? extends Customer> customItemReader() {
-		return new JsonItemReaderBuilder<Customer>()
-			.name("jsonReader")
-			.resource(new ClassPathResource("customer.json"))
-			.jsonObjectReader(new JacksonJsonObjectReader<>(Customer.class))
+
+		return new JdbcCursorItemReaderBuilder<Customer>()
+			.name("jdbcCursorItemReader")
+			.fetchSize(chunkSize)
+			.sql(
+				"select id, firstName, lastName, birthdate from customer where firstName like ? order by lastName, firstName")
+			.beanRowMapper(Customer.class)
+			.queryArguments("A%")
+			.dataSource(dataSource)
 			.build();
+
 	}
 
 	@Bean
