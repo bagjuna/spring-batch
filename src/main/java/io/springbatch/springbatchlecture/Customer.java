@@ -1,5 +1,7 @@
 package io.springbatch.springbatchlecture;
 
+import java.util.Date;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -7,8 +9,9 @@ import lombok.Data;
 @AllArgsConstructor
 public class Customer {
 
-	private long id;
-	private String name;
-	private int age;
 
+	private final long id;
+	private final String firstName;
+	private final String lastName;
+	private final Date birthdate;
 }
