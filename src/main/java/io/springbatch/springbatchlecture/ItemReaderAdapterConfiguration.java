@@ -9,7 +9,7 @@ import org.springframework.batch.core.configuration.annotation.StepBuilderFactor
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
-import org.springframework.batch.item.database.builder.JpaPagingItemReaderBuilder;
+import org.springframework.batch.item.adapter.ItemReaderAdapter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,8 +17,7 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 @Configuration
-public class JpaPagingConfiguration {
-
+public class ItemReaderAdapterConfiguration {
 	private final JobBuilderFactory jobBuilderFactory;
 	private final StepBuilderFactory stepBuilderFactory;
 	private final EntityManagerFactory entityManagerFactory;
@@ -31,32 +30,37 @@ public class JpaPagingConfiguration {
 			.build();
 	}
 
+
+
 	@Bean
 	public Step step1() throws Exception {
 		return stepBuilderFactory.get("step1")
-			.<Customer, Customer>chunk(10)
+			.<String, String>chunk(10)
 			.reader(customItemReader())
 			.writer(customItemWriter())
 			.build();
 	}
 
 	@Bean
-	public ItemReader<? extends Customer> customItemReader() {
-		return new JpaPagingItemReaderBuilder<Customer>()
-			.name("jpaPagingItemReader")
-			.entityManagerFactory(entityManagerFactory)
-			.pageSize(10)
-			.queryString("select c from Customer c join fetch c.address")
-			.build();
+	public ItemReader<String> customItemReader() {
+
+		ItemReaderAdapter<String> reader = new ItemReaderAdapter<>();
+		reader.setTargetObject(customService());
+		reader.setTargetMethod("customRead");
+
+		return reader;
 
 	}
 
 	@Bean
-	public ItemWriter<Customer> customItemWriter() {
+	public Object customService() {
+		return new CustomService();
+	}
+
+	@Bean
+	public ItemWriter<String> customItemWriter() {
 		return items -> {
-			for (Customer customer : items) {
-				System.out.println(customer.getAddress().getLocation());
-			}
+			System.out.println(items);
 		};
 	}
 }
