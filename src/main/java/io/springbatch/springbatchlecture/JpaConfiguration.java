@@ -3,6 +3,8 @@ package io.springbatch.springbatchlecture;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 
 import org.springframework.batch.core.Job;
@@ -10,28 +12,26 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JdbcPagingItemReader;
 import org.springframework.batch.item.database.Order;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.item.database.support.MySqlPagingQueryProvider;
-import org.springframework.batch.item.json.JacksonJsonObjectMarshaller;
-import org.springframework.batch.item.json.JsonFileItemWriter;
-import org.springframework.batch.item.json.builder.JsonFileItemWriterBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.FileSystemResource;
 
 import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
-public class JdbcBatchConfiguration {
+public class JpaConfiguration {
 
 	private final JobBuilderFactory jobBuilderFactory;
 	private final StepBuilderFactory stepBuilderFactory;
 	private final DataSource dataSource;
+	private final EntityManagerFactory entityManagerFactory;
 	@Value("${file.path}")
 	private String filePath;
 
@@ -46,15 +46,21 @@ public class JdbcBatchConfiguration {
 	@Bean
 	public Step step1() {
 		return stepBuilderFactory.get("step1")
-			.<Customer, Customer>chunk(10)
+			.<Customer, Customer2>chunk(10)
 			.reader(customItemReader())
+			.processor(customItemProcessor())
 			.writer(customItemWriter())
 			.build();
 	}
 
 	@Bean
-	public ItemWriter<? super Customer> customItemWriter() {
-		return new JdbcBatchItemWriterBuilder<Customer>()
+	public ItemProcessor<? super Customer, ? extends Customer2> customItemProcessor() {
+		return new CustomItemProcessor();
+	}
+
+	@Bean
+	public ItemWriter<? super Customer2> customItemWriter() {
+		return new JdbcBatchItemWriterBuilder<Customer2>()
 			.dataSource(dataSource)
 			.sql("insert into customer2 (id, first_name, last_name, birthdate) values (:id, :firstName, :lastName, :birthdate)")
 			.beanMapped()
