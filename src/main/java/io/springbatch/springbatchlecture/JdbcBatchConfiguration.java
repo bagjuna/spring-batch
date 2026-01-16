@@ -10,8 +10,10 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JdbcPagingItemReader;
 import org.springframework.batch.item.database.Order;
+import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.item.database.support.MySqlPagingQueryProvider;
 import org.springframework.batch.item.json.JacksonJsonObjectMarshaller;
 import org.springframework.batch.item.json.JsonFileItemWriter;
@@ -25,7 +27,7 @@ import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
-public class JsonConfiguration {
+public class JdbcBatchConfiguration {
 
 	private final JobBuilderFactory jobBuilderFactory;
 	private final StepBuilderFactory stepBuilderFactory;
@@ -47,6 +49,15 @@ public class JsonConfiguration {
 			.<Customer, Customer>chunk(10)
 			.reader(customItemReader())
 			.writer(customItemWriter())
+			.build();
+	}
+
+	@Bean
+	public ItemWriter<? super Customer> customItemWriter() {
+		return new JdbcBatchItemWriterBuilder<Customer>()
+			.dataSource(dataSource)
+			.sql("insert into customer2 (id, first_name, last_name, birthdate) values (:id, :firstName, :lastName, :birthdate)")
+			.beanMapped()
 			.build();
 	}
 
@@ -76,15 +87,6 @@ public class JsonConfiguration {
 		reader.setParameterValues(parameters);
 
 		return reader;
-	}
-
-	@Bean
-	public JsonFileItemWriter<Customer> customItemWriter() {
-		return new JsonFileItemWriterBuilder<Customer>()
-			.jsonObjectMarshaller(new JacksonJsonObjectMarshaller<>())
-			.resource(new FileSystemResource(filePath + "/customer.json"))
-			.name("customerJsonFileItemWriter")
-			.build();
 	}
 
 }
