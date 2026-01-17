@@ -1,6 +1,7 @@
 package io.springbatch.springbatchlecture;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -9,11 +10,7 @@ import org.springframework.batch.core.configuration.annotation.StepBuilderFactor
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
-import org.springframework.batch.item.NonTransientResourceException;
-import org.springframework.batch.item.ParseException;
-import org.springframework.batch.item.UnexpectedInputException;
-import org.springframework.batch.item.support.CompositeItemProcessor;
-import org.springframework.batch.item.support.builder.CompositeItemProcessorBuilder;
+import org.springframework.batch.item.support.ClassifierCompositeItemProcessor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -21,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
-public class CompositionItemConfiguration {
+public class ClassifierConfiguration {
 
 	private final JobBuilderFactory jobBuilderFactory;
 	private final StepBuilderFactory stepBuilderFactory;
@@ -37,27 +34,34 @@ public class CompositionItemConfiguration {
 	@Bean
 	public Step step1() {
 		return stepBuilderFactory.get("step1")
-			.<String, String>chunk(10)
+			.<ProcessorInfo, ProcessorInfo>chunk(10)
 			.reader(new ItemReader<>() {
 				int i = 0;
-
 				@Override
-				public String read() throws Exception, UnexpectedInputException, ParseException, NonTransientResourceException {
+				public ProcessorInfo read() throws Exception {
 					i++;
-					return i > 10 ? null : "item" + i;
+					ProcessorInfo processorInfo = ProcessorInfo.builder().id(i).build();
+
+					return i > 3 ? null : processorInfo;
 				}
 			})
 			.processor(customItemProcessor())
-			.writer(items -> System.out.println(items))
 			.build();
 	}
 
 	@Bean
-	public ItemProcessor<String, String> customItemProcessor() {
-		List itemProcessors = List.of(new CustomItemProcessor(), new CustomItemProcessor2());
-		return new CompositeItemProcessorBuilder<>()
-			.delegates(itemProcessors)
-			.build();
-	}
+	public ItemProcessor<? super ProcessorInfo, ? extends ProcessorInfo> customItemProcessor() {
+		ClassifierCompositeItemProcessor<ProcessorInfo, ProcessorInfo> processor = new ClassifierCompositeItemProcessor<>();
 
+		ProcessorClassifier<ProcessorInfo, ItemProcessor<? ,? extends ProcessorInfo>> classifier = new ProcessorClassifier<>();
+		Map<Integer, ItemProcessor<ProcessorInfo, ProcessorInfo>> processorMap = new HashMap<>();
+		processorMap.put(1, new CustomItemProcessor1());
+		processorMap.put(2, new CustomItemProcessor2());
+		processorMap.put(3, new CustomItemProcessor3());
+
+		classifier.setProcessorMap(processorMap);
+		processor.setClassifier(classifier);
+
+		return processor;
+	}
 }
