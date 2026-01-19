@@ -1,22 +1,17 @@
 package io.springbatch.springbatchlecture;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
-import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.retry.RetryPolicy;
-import org.springframework.retry.policy.SimpleRetryPolicy;
 
 import lombok.RequiredArgsConstructor;
 
@@ -40,20 +35,11 @@ public class RetryConfiguration {
 		return stepBuilderFactory.get("step1")
 			.<String, String>chunk(5)
 			.reader(reader())
-			.processor(processor())
 			.writer(items -> items.forEach(item -> System.out.println(item)))
 			.faultTolerant()
-			.skip(RetryableException.class)
-			.skipLimit(2)
-			// .retry(RetryableException.class)
-			// .retryLimit(2)
-			.retryPolicy(retryPolicy())
+			.retry(RetryableException.class)
+			.retryLimit(2)
 			.build();
-	}
-
-	@Bean
-	public ItemProcessor<? super String, String> processor() {
-		return new RetryItemProcessor();
 	}
 
 	@Bean
@@ -63,16 +49,5 @@ public class RetryConfiguration {
 			items.add(String.valueOf(i));
 		}
 		return new ListItemReader<>(items);
-	}
-
-	@Bean
-	public RetryPolicy retryPolicy() {
-		Map<Class<? extends Throwable>, Boolean> exceptionClass = new HashMap<>();
-		exceptionClass.put(RetryableException.class, true);
-
-		SimpleRetryPolicy simpleRetryPolicy = new SimpleRetryPolicy(2, exceptionClass);
-
-		return simpleRetryPolicy;
-
 	}
 }
