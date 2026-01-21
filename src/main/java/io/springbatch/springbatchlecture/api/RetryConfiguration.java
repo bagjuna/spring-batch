@@ -1,4 +1,5 @@
-package io.springbatch.springbatchlecture;
+package io.springbatch.springbatchlecture.api;
+/*
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +14,8 @@ import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import io.springbatch.springbatchlecture.RetryableException;
+import io.springbatch.springbatchlecture.api.RetryItemProcessor;
 import lombok.RequiredArgsConstructor;
 
 @Configuration
@@ -24,7 +27,7 @@ public class RetryConfiguration {
 
 	@Bean
 	public Job job() {
-		return jobBuilderFactory.get("batchJob")
+		return jobBuilderFactory.get("batchJob1")
 			.incrementer(new RunIdIncrementer())
 			.start(step1())
 			.build();
@@ -51,3 +54,4 @@ public class RetryConfiguration {
 		return new ListItemReader<>(items);
 	}
 }
+*/
