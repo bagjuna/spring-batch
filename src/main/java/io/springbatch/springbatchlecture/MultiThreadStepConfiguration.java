@@ -88,7 +88,7 @@ public class MultiThreadStepConfiguration {
 		JdbcPagingItemReader<Customer> reader = new JdbcPagingItemReader<>();
 
 		reader.setDataSource(this.dataSource);
-		reader.setPageSize(10);
+		reader.setPageSize(100);
 		reader.setRowMapper(new CustomerRowMapper());
 
 		MySqlPagingQueryProvider queryProvider = new MySqlPagingQueryProvider();
