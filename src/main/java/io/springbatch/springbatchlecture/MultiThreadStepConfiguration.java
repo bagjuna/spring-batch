@@ -15,18 +15,22 @@ import org.springframework.batch.integration.async.AsyncItemWriter;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
+import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.database.JdbcPagingItemReader;
 import org.springframework.batch.item.database.Order;
+import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
 import org.springframework.batch.item.database.support.MySqlPagingQueryProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
-public class AsyncConfiguration {
+public class MultiThreadStepConfiguration {
 
 	private final JobBuilderFactory jobBuilderFactory;
 	private final StepBuilderFactory stepBuilderFactory;
@@ -36,8 +40,7 @@ public class AsyncConfiguration {
 	public Job job() throws Exception {
 		return jobBuilderFactory.get("batchJob")
 			.incrementer(new RunIdIncrementer())
-			// .start(step1())
-			.start(asyncStep1())
+			.start(step1())
 			.listener(new StopWatchJobListener())
 			.build();
 	}
@@ -45,41 +48,39 @@ public class AsyncConfiguration {
 	@Bean
 	public Step step1() throws Exception{
 		return stepBuilderFactory.get("step1")
-			.<Customer, Customer>chunk(5)
-			.reader(pagingItemReader())
-			.processor(customItemProcessor())
-			.writer(customItemWriter())
-			.build();
-	}
-
-
-	@Bean
-	public Step asyncStep1() throws Exception {
-		return stepBuilderFactory.get("asyncStep1")
 			.<Customer, Customer>chunk(100)
 			.reader(pagingItemReader())
-			.processor(asyncItemProcessor())
-			.writer(asyncItemWriter())
+			// .reader(customItemReader())
+			.listener(new CustomItemReaderListener())
+			.processor((ItemProcessor<? super Customer, ? extends Customer>)item -> item)
+			.listener(new CustomItemProcessorListener())
+			.writer(customItemWriter())
+			.listener(new CustomItemWriterListener())
+			.taskExecutor(taskExecutor())
 			.build();
 	}
 
 	@Bean
-	public AsyncItemProcessor asyncItemProcessor() throws InterruptedException {
+	public TaskExecutor taskExecutor() {
+		ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
+		taskExecutor.setCorePoolSize(4);
+		taskExecutor.setMaxPoolSize(8);
+		taskExecutor.setThreadNamePrefix("async-thread");
 
-		AsyncItemProcessor<Customer, Customer> asyncItemProcessor = new AsyncItemProcessor<>();
-		asyncItemProcessor.setDelegate(customItemProcessor());
-		asyncItemProcessor.setTaskExecutor(new SimpleAsyncTaskExecutor());
-
-		return asyncItemProcessor;
+		return taskExecutor;
 	}
 
+
 	@Bean
-	public AsyncItemWriter<Customer> asyncItemWriter() throws InterruptedException {
+	public JdbcCursorItemReader<Customer> customItemReader() throws Exception {
+		return new JdbcCursorItemReaderBuilder()
+			.name("jdbcCursorItemReader")
+			.fetchSize(100)
+			.sql("select id, first_name, last_name, birthdate from customer order by id")
+			.beanRowMapper(Customer.class)
+			.dataSource(dataSource)
+			.build();
 
-		AsyncItemWriter<Customer> asyncItemWriter = new AsyncItemWriter<>();
-		asyncItemWriter.setDelegate(customItemWriter());
-
-		return asyncItemWriter;
 	}
 
 	@Bean
@@ -108,19 +109,6 @@ public class AsyncConfiguration {
 	}
 
 	@Bean
-	public ItemProcessor<Customer, Customer> customItemProcessor() throws InterruptedException {
-
-
-		return new ItemProcessor<Customer, Customer>() {
-			@Override
-			public Customer process(Customer item) throws Exception {
-				Thread.sleep(30);
-				return new Customer(item.getId(), item.getFirstName().toUpperCase(), item.getLastName().toUpperCase(), item.getBirthdate());
-			}
-		};
-	}
-
-	@Bean
 	public JdbcBatchItemWriter customItemWriter() {
 		JdbcBatchItemWriter<Customer> writer = new JdbcBatchItemWriter<>();
 		writer.setDataSource(this.dataSource);
@@ -130,5 +118,6 @@ public class AsyncConfiguration {
 
 		return writer;
 	}
+
 
 }
