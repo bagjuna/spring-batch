@@ -111,7 +111,7 @@ public class PartitioningConfiguration {
 		JdbcBatchItemWriter<Customer> itemWriter = new JdbcBatchItemWriter<>();
 
 		itemWriter.setDataSource(this.dataSource);
-		itemWriter.setSql("insert into customer2 values (:id, :firstName, :lastN8ame, :birthdate)");
+		itemWriter.setSql("insert into customer2 values (:id, :firstName, :lastName, :birthdate)");
 		itemWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider());
 		itemWriter.afterPropertiesSet();
 
